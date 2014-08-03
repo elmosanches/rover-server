@@ -300,6 +300,25 @@ class ProtocolConnectionsRequestsTest(unittest.TestCase):
         self.assertEqual(r_for_controller, self.expected_r_for_c)
         self.assertEqual(r_for_device, self.expected_r_for_d)
 
+    def test_device_sends_request_to_controller_no_enpoint_error(self):
+
+        REQUEST = '0:0:0'
+
+        self.expected_r_for_d += 'SE:E_20' + END_LINE
+
+        #controller disconnects
+        self.proto_controller.connectionLost('network failure')
+
+        #device send request
+        DR_REQUEST = 'RE:' + REQUEST + END_LINE
+        self.proto_device.dataReceived(DR_REQUEST)
+
+        r_for_controller = self.tr_controller.value()
+        r_for_device = self.tr_device.value()
+
+        self.assertEqual(r_for_controller, self.expected_r_for_c)
+        self.assertEqual(r_for_device, self.expected_r_for_d)
+
 
 def proto_factory():
     proto = ServerProtocol()

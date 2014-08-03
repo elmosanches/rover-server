@@ -32,8 +32,7 @@ class ProtocolConnections(object):
 
     errors:
     E_10 - invalid client command
-    E_20 - no device connected
-    E_30 - no controller connected
+    E_20 - no endpoint connected
 
     """
 
@@ -64,12 +63,11 @@ class ProtocolConnections(object):
             protocol.sendLine('CD:OK')
 
         elif command == 'RE':
-            device_protocol = clk.protocols[protocol.get_endpoint()]
-            device_protocol.sendLine('RE:' + body)
-
-        # elif command == 'DR':
-        #     controller_protocol = clk.protocols[protocol.get_endpoint()]
-        #     controller_protocol.sendLine('DR:' + body)
+            device_protocol = clk.protocols.get(protocol.get_endpoint(), None)
+            if device_protocol:
+                device_protocol.sendLine('RE:' + body)
+            else:
+                protocol.sendLine('SE:E_20')
 
         #invalid client request
         else:
@@ -110,7 +108,7 @@ class ProtocolConnections(object):
         protocol.sendLine(response_line)
 
         log.msg(
-            'devicec available: {} sent to {}'.format(
+            'notifying {} about available devices: {}'.format(
                 response_line,
                 protocol.name,
             )
@@ -131,20 +129,25 @@ class ProtocolConnections(object):
         controller_protocol.name = controller_name
         clk.controllers.add(controller_name)
         clk.protocols[controller_name] = controller_protocol
-        print "controller is connected"
+        log.msg("controller {} is connected", controller_name)
 
-        #respond with list of connected devices
+        #notify connected controller about connected devices
         devices_available = clk.get_available_devices()
         clk.notify_about_available_devices(
             controller_protocol, devices_available
         )
 
-
-
     @classmethod
     def make_connection(clk, device_protocol, controller_protocol):
         device_protocol.connect_endpoint(controller_protocol.name)
         controller_protocol.connect_endpoint(device_protocol.name)
+        log.msg("controller {} is connected to device {}".\
+            format(
+                controller_protocol.name,
+                device_protocol.name
+            )
+        )
+
         clk.notify_all_about_available_devices()
 
     @classmethod
@@ -161,12 +164,12 @@ class ProtocolConnections(object):
             clk.notify_all_about_available_devices()
 
         elif protocol.name in clk.controllers:
+            clk.controllers.remove(protocol.name)
             end_protocol = clk.protocols.get(protocol.get_endpoint(), None)
             if end_protocol is not None:
                 end_protocol.disconnect_endpoint()
                 clk.notify_all_about_available_devices()
 
-            clk.controllers.remove(protocol.name)
         else:
             log.err('ERROR - protocol {} neither in controllers nor devices'.\
                     format(protocol.name)
@@ -196,7 +199,7 @@ class ServerProtocol(LineReceiver):
     endpoint = None
 
     def connectionMade(self):
-        print "connection from a client made"
+        log.msg("connection from a client made")
 
     def connectionLost(self, reason):
         log.msg("connection lost: {}".format(reason))
@@ -205,7 +208,7 @@ class ServerProtocol(LineReceiver):
         ProtocolConnections.disconnect_protocol(self)
 
     def lineReceived(self, line):
-        print line
+        log.msg("line received: {}".format(line))
 
         ProtocolConnections.line_received(self, line)
 
@@ -237,7 +240,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-p", "--port",
-        help="port on which server will listen",
+        help="port on which server will listen for connections",
         action="store_true"
     )
 
