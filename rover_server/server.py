@@ -7,6 +7,11 @@ from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor
 
 
+#@TODO
+"""
+-handling when anther device tries to connect with a name same as already connected device
+-handle what happens if connecting name has a new line
+"""
 class ProtocolConnections(object):
     """
     client request structure:
@@ -33,6 +38,7 @@ class ProtocolConnections(object):
     errors:
     E_10 - invalid client command
     E_20 - no endpoint connected
+    E_21 - cannot connect to selected device
 
     """
 
@@ -57,9 +63,11 @@ class ProtocolConnections(object):
         # controller is connecting to selected device
         elif command == 'CD':
             device_name = body
-            device_protocol = clk.protocols[device_name]
+            device_protocol = clk.protocols.get(device_name)
+            if device_protocol is None:
+                protocol.sendLine('CD:E_21')
+                return
             clk.make_connection(device_protocol, protocol)
-
             protocol.sendLine('CD:OK')
 
         elif command == 'RE':
