@@ -1,4 +1,5 @@
 import sys
+import re
 import argparse
 
 from twisted.python import log
@@ -7,11 +8,6 @@ from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor
 
 
-#@TODO
-"""
--handling when anther device tries to connect with a name same as already connected device
--handle what happens if connecting name has a new line
-"""
 class ProtocolConnections(object):
     """
     client request structure:
@@ -37,6 +33,8 @@ class ProtocolConnections(object):
 
     errors:
     E_10 - invalid client command
+    E_11 - name given by the connecting client is already being used
+    E_12 - name is invalid (usuported characters)
     E_20 - no endpoint connected
     E_21 - cannot connect to selected device
 
@@ -90,7 +88,24 @@ class ProtocolConnections(object):
         return line[3:]
 
     @classmethod
+    def is_name_valid(clk, name):
+        #is name available
+        if name in clk.protocols:
+            return 'E_11'
+
+        #no invalid characters
+        if re.match(r'^[\w_]+$', name) is None:
+            return 'E_12'
+
+        return 0
+
+    @classmethod
     def connect_device(clk, device_protocol, device_name):
+        validation_result = clk.is_name_valid(device_name)
+        if validation_result != 0:
+            device_protocol.sendLine('DC:' + validation_result)
+            return
+
         device_protocol.name = device_name
         clk.devices.add(device_name)
         clk.protocols[device_name] = device_protocol
@@ -134,6 +149,11 @@ class ProtocolConnections(object):
 
     @classmethod
     def connect_controller(clk, controller_protocol, controller_name):
+        validation_result = clk.is_name_valid(controller_name)
+        if validation_result != 0:
+            controller_protocol.sendLine('CC:' + validation_result)
+            return
+
         controller_protocol.name = controller_name
         clk.controllers.add(controller_name)
         clk.protocols[controller_name] = controller_protocol
