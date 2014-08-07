@@ -269,14 +269,14 @@ def main():
     parser.add_argument(
         "-p", "--port",
         help="port on which server will listen for connections",
-        action="store_true"
+        required=False,
     )
 
     args = parser.parse_args()
 
     port = DEFAULT_PORT
     if args.port:
-        port = args.port
+        port = int(args.port)
 
     reactor.listenTCP(port, ServerFactory())
     reactor.run()
